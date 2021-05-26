@@ -26,4 +26,4 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           push: true
-          tags: ghcr.io/${{ github.repository }}/lecture-service:latest
+          tags: ghcr.io/${{ github.repository }}:latest
