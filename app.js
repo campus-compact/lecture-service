@@ -1,5 +1,6 @@
 import express from 'express'
 import indexRoute from './routes/index.js'
+import keycloak from './api/keycloak.js'
 
 const app = express()
 
@@ -18,3 +19,6 @@ app.use(indexRoute)
 app.listen(port, () => {
   console.log(`Setup completed: Express is listening on port ${port}`)
 })
+
+//Keycloak
+app.use(keycloak.middleware());
