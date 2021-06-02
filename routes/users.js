@@ -6,6 +6,7 @@ const router = express.Router();
 
 const addr = process.env.CAMPUS_DUAL_SERVICE_ADDR || "127.0.0.1"
 const port = process.env.CAMPUS_DUAL_SERVICE_PORT || 4321
+const syncHours = process.env.CAMPUS_DUAL_SERVICE_SYNCHOURS || 24
 
 router.get('/', (req, res) => {
   User
@@ -18,17 +19,15 @@ router.get('/', (req, res) => {
     .catch(err => res.status(500).send(err.message))
 })
 
-router.get('/:userId/lectures', (req, res) => {
-  User
-    .findById(req.params.userId)
-    .then(user => {
-
+function getLecturesFromCdService(req,res,user) {
       const today = new Date();
       const datediff = Math.abs(user.updated - today)
       const datediffHours = datediff/1000/60/60;
 
       //Lectures beim Campusdual-Service aktualisieren, wenn ... Stunden vergangen sind
-      if(datediffHours >= 24) {
+      if(datediffHours >= syncHours) {
+
+        console.log("Update beim Campusdual-Service notwendig.");
 
         user.lectures = [];
 
@@ -80,6 +79,7 @@ router.get('/:userId/lectures', (req, res) => {
                 })
                 
           })
+          .catch(err => res.status(500).send(`Fehler beim Aufruf von POST bei |http://${addr}:${port}/lecture| mit folgendem Body: |${JSON.stringify(postBody)}| Meldung: ${err.message}`));
 
       } else {
         User
@@ -91,7 +91,28 @@ router.get('/:userId/lectures', (req, res) => {
               : res.sendStatus(404))
             .catch(err => res.status(500).send(err.message))
       }
+}
+
+router.get('/:userId/lectures', (req, res) => {
+  User
+    .findById(req.params.userId)
+    .then(user => {
+
+      if(user === null) {
+        // wenn Nutzer noch nicht existiert wird dieser angelegt
+        //Datum 1999: bewirkt, dass Lectures geladen werden.
+        const userInsertObj = {_id: req.params.userId, lectures: [], updated: new Date('1999-05-20 01:00')}
+        const userInsert = new User(userInsertObj)
+        userInsert.save()
+          .then(userInsert => userInsert
+            ? getLecturesFromCdService(req,res,userInsert)
+            : res.sendStatus(404))
+          .catch(err => res.status(500).send("Der gewünschte Nutzer existiert nicht. "+err.message))
+      } else {
+        getLecturesFromCdService(req,res,user);
+      }
     })
+    .catch(err => res.status(500).send(err.message))
 })
 
 router.post('/', async (req, res) => {
