@@ -12,6 +12,9 @@ console.log(`LectureService is starting in a ${isProduction ? 'production' : 'de
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
+//Keycloak
+app.use(keycloak.middleware());
+
 // Require Routes
 app.use(indexRoute)
 
@@ -19,6 +22,3 @@ app.use(indexRoute)
 app.listen(port, () => {
   console.log(`Setup completed: Express is listening on port ${port}`)
 })
-
-//Keycloak
-app.use(keycloak.middleware());
