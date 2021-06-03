@@ -23,8 +23,7 @@ function protectByUserId(token, req) {
         return true;
     } else {
         return false;
-    }
-    
+    } 
 }
 
 export default router

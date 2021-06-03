@@ -1,6 +1,7 @@
 import express from 'express'
 import User from '../models/user.js'
 import axios from 'axios'
+import jwt_decode  from 'jwt-decode'
 
 const router = express.Router();
 
@@ -27,10 +28,15 @@ function getLecturesFromCdService(req,res,user) {
       //Lectures beim Campusdual-Service aktualisieren, wenn ... Stunden vergangen sind
       if(datediffHours >= syncHours) {
 
-        console.log("Update beim Campusdual-Service notwendig.");
-
         user.lectures = [];
 
+        //Authentifizierungstoken wird übergeben
+        const token = req.headers.authorization.split(' ')[1];
+        const config = {
+          headers: {Authorization: `Bearer ${token}`}
+        }
+
+        //TODO: ersetzen, da künfig Authentifizierungstoken verwendet wird.
         const postBody = {
           username: req.params.userId,
           hash: "adc3486f70b23c8841d950a15fd5e947",
@@ -38,7 +44,7 @@ function getLecturesFromCdService(req,res,user) {
           end: 1622152800
         }
 
-        axios.post(`http://${addr}:${port}/lecture`,postBody)
+        axios.post(`http://${addr}:${port}/lecture`,postBody,config)
           .then((resp1) => {
 
             const body = resp1.data;
