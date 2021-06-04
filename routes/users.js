@@ -38,10 +38,7 @@ function getLecturesFromCdService(req,res,user) {
 
         //TODO: ersetzen, da künfig Authentifizierungstoken verwendet wird.
         const postBody = {
-          username: req.params.userId,
-          hash: "adc3486f70b23c8841d950a15fd5e947",
-          start: 1622066400,
-          end: 1622152800
+          username: req.params.userId
         }
 
         axios.post(`http://${addr}:${port}/lecture`,postBody,config)
