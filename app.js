@@ -12,8 +12,8 @@ console.log(`LectureService is starting in a ${isProduction ? 'production' : 'de
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
-//Keycloak
-app.use(keycloak.middleware());
+// Keycloak
+app.use(keycloak.middleware())
 
 // Require Routes
 app.use(indexRoute)

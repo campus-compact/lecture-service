@@ -1,11 +1,11 @@
 import express from 'express'
 import User from '../models/user.js'
 import axios from 'axios'
-import jwt_decode  from 'jwt-decode'
+import jwt_decode from 'jwt-decode'
 
-const router = express.Router();
+const router = express.Router()
 
-const addr = process.env.CAMPUS_DUAL_SERVICE_ADDR || "127.0.0.1"
+const addr = process.env.CAMPUS_DUAL_SERVICE_ADDR || '127.0.0.1'
 const port = process.env.CAMPUS_DUAL_SERVICE_PORT || 4321
 const syncHours = process.env.CAMPUS_DUAL_SERVICE_SYNCHOURS || 24
 
@@ -20,99 +20,92 @@ router.get('/', (req, res) => {
     .catch(err => res.status(500).send(err.message))
 })
 
-function getLecturesFromCdService(req,res,user) {
-      const today = new Date();
-      const datediff = Math.abs(user.updated - today)
-      const datediffHours = datediff/1000/60/60;
+function getLecturesFromCdService (req, res, user) {
+  const today = new Date()
+  const datediff = Math.abs(user.updated - today)
+  const datediffHours = datediff / 1000 / 60 / 60
 
-      //Lectures beim Campusdual-Service aktualisieren, wenn ... Stunden vergangen sind
-      if(datediffHours >= syncHours) {
+  // Lectures beim Campusdual-Service aktualisieren, wenn ... Stunden vergangen sind
+  if (datediffHours >= syncHours) {
+    user.lectures = []
 
-        user.lectures = [];
+    // Authentifizierungstoken wird übergeben
+    const token = req.headers.authorization.split(' ')[1]
+    const config = {
+      headers: { Authorization: `Bearer ${token}` }
+    }
 
-        //Authentifizierungstoken wird übergeben
-        const token = req.headers.authorization.split(' ')[1];
-        const config = {
-          headers: {Authorization: `Bearer ${token}`}
-        }
+    // TODO: ersetzen, da künfig Authentifizierungstoken verwendet wird.
+    const postBody = {
+      username: req.params.userId
+    }
 
-        //TODO: ersetzen, da künfig Authentifizierungstoken verwendet wird.
-        const postBody = {
-          username: req.params.userId
-        }
+    axios.post(`http://${addr}:${port}/lecture`, postBody, config)
+      .then((resp1) => {
+        const body = resp1.data
 
-        axios.post(`http://${addr}:${port}/lecture`,postBody,config)
-          .then((resp1) => {
+        body.forEach(element => {
+          const object = {
+            rooms: [element.room],
+            instructors: [element.instructor],
+            title: element.title,
+            start: element.start,
+            end: element.end,
+            allDay: element.allDay,
+            description: element.description,
+            color: element.color,
+            editable: element.editable
+          }
 
-            const body = resp1.data;
+          user.lectures.push(object)
+        })
 
-            body.forEach(element => {
+        user.updated = new Date()
 
-                  const object = {
-                    "rooms": [element.room],
-                    "instructors": [element.instructor],
-                    "title": element.title,
-                    "start": element.start,
-                    "end": element.end,
-                    "allDay": element.allDay,
-                    "description": element.description,
-                    "color": element.color,
-                    "editable": element.editable
-                  }
-                  
-                  user.lectures.push(object);
-                });
-      
-                user.updated = new Date();
-      
-                User
-                .findByIdAndUpdate(req.params.userId,user)
-                .lean()
-                .then(u => {
-      
-                  // Lectures zu einem User zurückgeben
-                  User
-                  .findById(req.params.userId)
-                  .select('lectures -_id')
-                  .lean()
-                  .then(user => user
-                    ? res.send(user.lectures)
-                    : res.sendStatus(404))
-                  .catch(err => res.status(500).send(err.message))
-                })
-                
-          })
-          .catch(err => res.status(500).send(`Fehler beim Aufruf von POST bei |http://${addr}:${port}/lecture| mit folgendem Body: |${JSON.stringify(postBody)}| Meldung: ${err.message}`));
-
-      } else {
         User
-            .findById(req.params.userId)
-            .select('lectures -_id')
-            .lean()
-            .then(user => user
-              ? res.send(user.lectures)
-              : res.sendStatus(404))
-            .catch(err => res.status(500).send(err.message))
-      }
+          .findByIdAndUpdate(req.params.userId, user)
+          .lean()
+          .then(u => {
+            // Lectures zu einem User zurückgeben
+            User
+              .findById(req.params.userId)
+              .select('lectures -_id')
+              .lean()
+              .then(user => user
+                ? res.send(user.lectures)
+                : res.sendStatus(404))
+              .catch(err => res.status(500).send(err.message))
+          })
+      })
+      .catch(err => res.status(500).send(`Fehler beim Aufruf von POST bei |http://${addr}:${port}/lecture| mit folgendem Body: |${JSON.stringify(postBody)}| Meldung: ${err.message}`))
+  } else {
+    User
+      .findById(req.params.userId)
+      .select('lectures -_id')
+      .lean()
+      .then(user => user
+        ? res.send(user.lectures)
+        : res.sendStatus(404))
+      .catch(err => res.status(500).send(err.message))
+  }
 }
 
 router.get('/:userId/lectures', (req, res) => {
   User
     .findById(req.params.userId)
     .then(user => {
-
-      if(user === null) {
+      if (user === null) {
         // wenn Nutzer noch nicht existiert wird dieser angelegt
-        //Datum 1999: bewirkt, dass Lectures geladen werden.
-        const userInsertObj = {_id: req.params.userId, lectures: [], updated: new Date('1999-05-20 01:00')}
+        // Datum 1999: bewirkt, dass Lectures geladen werden.
+        const userInsertObj = { _id: req.params.userId, lectures: [], updated: new Date('1999-05-20 01:00') }
         const userInsert = new User(userInsertObj)
         userInsert.save()
           .then(userInsert => userInsert
-            ? getLecturesFromCdService(req,res,userInsert)
+            ? getLecturesFromCdService(req, res, userInsert)
             : res.sendStatus(404))
-          .catch(err => res.status(500).send("Der gewünschte Nutzer existiert nicht. "+err.message))
+          .catch(err => res.status(500).send('Der gewünschte Nutzer existiert nicht. ' + err.message))
       } else {
-        getLecturesFromCdService(req,res,user);
+        getLecturesFromCdService(req, res, user)
       }
     })
     .catch(err => res.status(500).send(err.message))
