@@ -1,13 +1,16 @@
 import express from 'express'
 import User from '../models/user.js'
 import axios from 'axios'
-import jwt_decode from 'jwt-decode'
+import keycloak from '../api/keycloak.js'
 import config from '../config.js'
 
 const router = express.Router()
 
+function protectByUserId (token, req) {
+  return req.params.userId === token.content.preferred_username
+}
 
-router.get('/', (req, res) => {
+router.get('/', keycloak.protect(),(req, res) => {
   User
     .find()
     .select('-__v')
@@ -88,7 +91,7 @@ function getLecturesFromCdService (req, res, user) {
   }
 }
 
-router.get('/:userId/lectures', (req, res) => {
+router.get('/:userId/lectures', keycloak.protect(protectByUserId), (req, res) => {
   User
     .findById(req.params.userId)
     .then(user => {
@@ -109,7 +112,7 @@ router.get('/:userId/lectures', (req, res) => {
     .catch(err => res.status(500).send(err.message))
 })
 
-router.post('/', async (req, res) => {
+router.post('/', keycloak.protect(protectByUserId), async (req, res) => {
   const user = new User(req.body)
   user.save()
     .then(user => user
@@ -118,7 +121,7 @@ router.post('/', async (req, res) => {
     .catch(err => res.status(500).send(err.message))
 })
 
-router.put('/:userId', (req, res) => {
+router.put('/:userId', keycloak.protect(protectByUserId), (req, res) => {
   User
     .findByIdAndUpdate(req.params.userId, req.body)
     .lean()
@@ -128,7 +131,7 @@ router.put('/:userId', (req, res) => {
     .catch(err => res.status(500).send(err.message))
 })
 
-router.delete('/:userId', (req, res) => {
+router.delete('/:userId', keycloak.protect(protectByUserId), (req, res) => {
   User
     .findByIdAndRemove(req.params.userId)
     .lean()
