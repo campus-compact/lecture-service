@@ -2,12 +2,10 @@ import express from 'express'
 import User from '../models/user.js'
 import axios from 'axios'
 import jwt_decode from 'jwt-decode'
+import config from '../config.js'
 
 const router = express.Router()
 
-const addr = process.env.CAMPUS_DUAL_SERVICE_ADDR || '127.0.0.1'
-const port = process.env.CAMPUS_DUAL_SERVICE_PORT || 4321
-const syncHours = process.env.CAMPUS_DUAL_SERVICE_SYNCHOURS || 24
 
 router.get('/', (req, res) => {
   User
@@ -26,12 +24,12 @@ function getLecturesFromCdService (req, res, user) {
   const datediffHours = datediff / 1000 / 60 / 60
 
   // Lectures beim Campusdual-Service aktualisieren, wenn ... Stunden vergangen sind
-  if (datediffHours >= syncHours) {
+  if (datediffHours >= config.syncHours) {
     user.lectures = []
 
     // Authentifizierungstoken wird übergeben
     const token = req.headers.authorization.split(' ')[1]
-    const config = {
+    const axiosConfig = {
       headers: { Authorization: `Bearer ${token}` }
     }
 
@@ -40,7 +38,7 @@ function getLecturesFromCdService (req, res, user) {
       username: req.params.userId
     }
 
-    axios.post(`http://${addr}:${port}/lecture`, postBody, config)
+    axios.post(`http://${config.campusDualServiceAddr}:${config.campusDualServicePort}/lecture`, postBody, axiosConfig)
       .then((resp1) => {
         const body = resp1.data
 
@@ -77,7 +75,7 @@ function getLecturesFromCdService (req, res, user) {
               .catch(err => res.status(500).send(err.message))
           })
       })
-      .catch(err => res.status(500).send(`Fehler beim Aufruf von POST bei |http://${addr}:${port}/lecture| mit folgendem Body: |${JSON.stringify(postBody)}| Meldung: ${err.message}`))
+      .catch(err => res.status(500).send(`Fehler beim Aufruf von POST bei |http://${config.campusDualServiceAddr}:${config.campusDualServicePort}/lecture| mit folgendem Body: |${JSON.stringify(postBody)}| Meldung: ${err.message}`) )
   } else {
     User
       .findById(req.params.userId)
