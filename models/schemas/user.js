@@ -4,5 +4,4 @@ import Lecture from './lecture.js'
 export default new mongoose.Schema({
   _id: { type: String, required: true },
   lectures: { type: [Lecture] },
-  updated: { type: Date, default: Date.now }
-})
+}, { timestamps: true })

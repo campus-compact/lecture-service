@@ -48,7 +48,7 @@ router.get('/:userId/lectures', keycloak.protect(protectByUserId), async (req, r
   }
 
   const now = new Date()
-  if (user.lectures.length === 0 || (now - user.updated) / 1000 / 60 > config.syncMinutes) {
+  if (user.lectures.length === 0 || (now - user.updatedAt) / 1000 / 60 > config.syncMinutes) {
     // User was last updated more than config.syncMinutes ago. Get fresh lectures!
     const postUrl = `http://${config.campusDualServiceAddr}:${config.campusDualServicePort}/lecture`
     const postBody = { username: req.params.userId }
