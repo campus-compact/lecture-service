@@ -6,139 +6,78 @@ import config from '../config.js'
 
 const router = express.Router()
 
+/**
+ * Helper to ensure the requests userId matches the tokens preferred_username.
+ * @param token
+ * @param req
+ * @returns {boolean}
+ */
 function protectByUserId (token, req) {
   return req.params.userId === token.content.preferred_username
 }
 
-router.get('/', keycloak.protect(),(req, res) => {
-  User
-    .find()
-    .select('-__v')
-    .lean()
-    .then(user => user
-      ? res.send(user)
-      : res.sendStatus(404))
-    .catch(err => res.status(500).send(err.message))
-})
-
-function getLecturesFromCdService (req, res, user) {
-  const today = new Date()
-  const datediff = Math.abs(user.updated - today)
-  const datediffHours = datediff / 1000 / 60 / 60
-
-  // Lectures beim Campusdual-Service aktualisieren, wenn ... Stunden vergangen sind
-  if (datediffHours >= config.syncHours) {
-    user.lectures = []
-
-    // Authentifizierungstoken wird übergeben
-    const token = req.headers.authorization.split(' ')[1]
-    const axiosConfig = {
-      headers: { Authorization: `Bearer ${token}` }
-    }
-
-    // TODO: ersetzen, da künfig Authentifizierungstoken verwendet wird.
-    const postBody = {
-      username: req.params.userId
-    }
-
-    axios.post(`http://${config.campusDualServiceAddr}:${config.campusDualServicePort}/lecture`, postBody, axiosConfig)
-      .then((resp1) => {
-        const body = resp1.data
-
-        body.forEach(element => {
-          const object = {
-            rooms: [element.room],
-            instructors: [element.instructor],
-            title: element.title,
-            start: element.start,
-            end: element.end,
-            allDay: element.allDay,
-            description: element.description,
-            color: element.color,
-            editable: element.editable
-          }
-
-          user.lectures.push(object)
-        })
-
-        user.updated = new Date()
-
-        User
-          .findByIdAndUpdate(req.params.userId, user)
-          .lean()
-          .then(u => {
-            // Lectures zu einem User zurückgeben
-            User
-              .findById(req.params.userId)
-              .select('lectures -_id')
-              .lean()
-              .then(user => user
-                ? res.send(user.lectures)
-                : res.sendStatus(404))
-              .catch(err => res.status(500).send(err.message))
-          })
-      })
-      .catch(err => res.status(500).send(`Fehler beim Aufruf von POST bei |http://${config.campusDualServiceAddr}:${config.campusDualServicePort}/lecture| mit folgendem Body: |${JSON.stringify(postBody)}| Meldung: ${err.message}`) )
-  } else {
-    User
-      .findById(req.params.userId)
-      .select('lectures -_id')
-      .lean()
-      .then(user => user
-        ? res.send(user.lectures)
-        : res.sendStatus(404))
-      .catch(err => res.status(500).send(err.message))
+/**
+ * Map lectures from campus dual format to the format of our lecture schema
+ * @param lecture
+ * @returns {{allDay, rooms: *[], color, editable, start, description: string, end, title, instructors: *[]}}
+ */
+function mapLecture (lecture) {
+  return {
+    rooms: [...new Set([lecture.room, lecture.sroom])],
+    instructors: [...new Set([lecture.instructor, lecture.sinstructor])],
+    title: lecture.title,
+    start: lecture.start,
+    end: lecture.end,
+    allDay: lecture.allDay,
+    description: [...new Set([lecture.description, lecture.remarks])].join(', '),
+    color: lecture.color,
+    editable: lecture.editable
   }
 }
 
-router.get('/:userId/lectures', keycloak.protect(protectByUserId), (req, res) => {
-  User
-    .findById(req.params.userId)
-    .then(user => {
-      if (user === null) {
-        // wenn Nutzer noch nicht existiert wird dieser angelegt
-        // Datum 1999: bewirkt, dass Lectures geladen werden.
-        const userInsertObj = { _id: req.params.userId, lectures: [], updated: new Date('1999-05-20 01:00') }
-        const userInsert = new User(userInsertObj)
-        userInsert.save()
-          .then(userInsert => userInsert
-            ? getLecturesFromCdService(req, res, userInsert)
-            : res.sendStatus(404))
-          .catch(err => res.status(500).send('Der gewünschte Nutzer existiert nicht. ' + err.message))
-      } else {
-        getLecturesFromCdService(req, res, user)
-      }
-    })
-    .catch(err => res.status(500).send(err.message))
+router.get('/', keycloak.protect('realm:admin'), async (req, res) => {
+  const user = await User.find().select('-__v').lean()
+  user ? res.send(user) : res.sendStatus(404)
 })
 
-router.post('/', keycloak.protect(protectByUserId), async (req, res) => {
-  const user = new User(req.body)
-  user.save()
-    .then(user => user
-      ? res.status(201).send(user)
-      : res.sendStatus(404))
-    .catch(err => res.status(500).send(err.message))
+router.get('/:userId/lectures', keycloak.protect(protectByUserId), async (req, res, next) => {
+  let user = await User.findById(req.params.userId)
+
+  if (user === null) {
+    user = await User.create({ _id: req.params.userId })
+  }
+
+  const now = new Date()
+  if (user.lectures.length === 0 || (now - user.updated) / 1000 / 60 > config.syncMinutes) {
+    // User was last updated more than config.syncMinutes ago. Get fresh lectures!
+    const postUrl = `http://${config.campusDualServiceAddr}:${config.campusDualServicePort}/lecture`
+    const postBody = { username: req.params.userId }
+    const postConfig = { headers: { Authorization: req.headers.authorization } }
+    const response = await axios.post(postUrl, postBody, postConfig)
+    if (response.status !== 200) {
+      return next(new Error(`Requesting new lectures failed with status ${response.status}\n${response.data}`))
+    }
+    user.lectures = response.data.map(mapLecture)
+    user.updated = now
+    await user.save()
+  }
+
+  res.send(user.lectures)
 })
 
-router.put('/:userId', keycloak.protect(protectByUserId), (req, res) => {
-  User
-    .findByIdAndUpdate(req.params.userId, req.body)
-    .lean()
-    .then(user => user
-      ? res.sendStatus(204)
-      : res.sendStatus(404))
-    .catch(err => res.status(500).send(err.message))
+router.post('/', keycloak.protect('realm:admin'), async (req, res) => {
+  const user = await User.create(req.body)
+  res.status(201).send(user)
 })
 
-router.delete('/:userId', keycloak.protect(protectByUserId), (req, res) => {
-  User
-    .findByIdAndRemove(req.params.userId)
-    .lean()
-    .then(user => user
-      ? res.sendStatus(204)
-      : res.sendStatus(404))
-    .catch(err => res.status(500).send(err.message))
+router.put('/:userId', keycloak.protect('realm:admin'), async (req, res) => {
+  const user = await User.findByIdAndUpdate(req.params.userId, req.body).lean()
+  user ? res.sendStatus(204) : res.sendStatus(404)
+})
+
+router.delete('/:userId', keycloak.protect(protectByUserId), async (req, res) => {
+  const user = await User.findByIdAndRemove(req.params.userId).lean()
+  user ? res.sendStatus(204) : res.sendStatus(404)
 })
 
 export default router
