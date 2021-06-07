@@ -1,7 +1,7 @@
 import Keycloak from 'keycloak-connect'
 import session from 'express-session'
 
-var memoryStore = new session.MemoryStore();
-var keycloak = new Keycloak({store: memoryStore});
+const memoryStore = new session.MemoryStore()
+const keycloak = new Keycloak({ store: memoryStore })
 
 export default keycloak
