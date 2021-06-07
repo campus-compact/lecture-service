@@ -37,7 +37,7 @@ function mapLecture (lecture) {
 
 router.get('/', keycloak.protect('realm:admin'), async (req, res) => {
   const user = await User.find().select('-__v').lean()
-  user ? res.send(user) : res.sendStatus(404)
+  user ? res.json(user) : res.sendStatus(404)
 })
 
 router.get('/:userId/lectures', keycloak.protect(protectByUserId), async (req, res, next) => {
@@ -58,16 +58,15 @@ router.get('/:userId/lectures', keycloak.protect(protectByUserId), async (req, r
       return next(new Error(`Requesting new lectures failed with status ${response.status}\n${response.data}`))
     }
     user.lectures = response.data.map(mapLecture)
-    user.updated = now
     await user.save()
   }
 
-  res.send(user.lectures)
+  res.json(user.lectures)
 })
 
 router.post('/', keycloak.protect('realm:admin'), async (req, res) => {
   const user = await User.create(req.body)
-  res.status(201).send(user)
+  res.status(201).json(user)
 })
 
 router.put('/:userId', keycloak.protect('realm:admin'), async (req, res) => {
