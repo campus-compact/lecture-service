@@ -12,3 +12,9 @@ docker run -it -v <<PROJECT PATH>>:/app -w /app -e PORT=3001 -p3001:3001 node:16
 docker build -t "campus-compact/lecture-service" .
 ```
 
+## API Documentation
+
+```
+http://localhost:3001/swagger
+```
+

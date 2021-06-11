@@ -35,11 +35,41 @@ function mapLecture (lecture) {
   }
 }
 
+/**
+ * @swagger
+ * /users/:
+ *   get:
+ *     security:
+ *      - Bearer: []
+ *     summary: Administratoren können alle Nutzer und Lectures abrufen 
+ *     responses:
+ *       "200":
+ *         description: Erfolgreich
+ *       "404":
+ *         description: Fehler/Nicht gefunden
+ *       "403":
+ *         description: Access denied
+*/
 router.get('/', keycloak.protect('realm:admin'), async (req, res) => {
   const user = await User.find().select('-__v').lean()
   user ? res.json(user) : res.sendStatus(404)
 })
 
+/**
+ * @swagger
+ * /users/{userId}/lectures:
+ *   get:
+ *     security:
+ *      - Bearer: []
+ *     summary: Alle Vorlesungen zu einem Benutzer werden ausgegeben
+ *     responses:
+ *       "200":
+ *         description: Erfolgreich - gibt Array aller Vorlesungen zurück
+ *       "500":
+ *         description: Fehler
+ *       "403":
+ *         description: Access denied
+*/
 router.get('/:userId/lectures', keycloak.protect(protectByUserId), async (req, res, next) => {
   let user = await User.findById(req.params.userId)
 
@@ -64,16 +94,61 @@ router.get('/:userId/lectures', keycloak.protect(protectByUserId), async (req, r
   res.json(user.lectures)
 })
 
+/**
+ * @swagger
+ * /users/:
+ *   post:
+ *     security:
+ *      - Bearer: []
+ *     summary: neuen Benuzter anlegen, nur für administrative Benutzer
+ *     responses:
+ *       "201":
+ *         description: Erfolgreich
+ *       "500":
+ *         description: Fehler
+ *       "403":
+ *         description: Access denied
+*/
 router.post('/', keycloak.protect('realm:admin'), async (req, res) => {
   const user = await User.create(req.body)
   res.status(201).json(user)
 })
 
+/**
+ * @swagger
+ * /users/{userId}:
+ *   put:
+ *     security:
+ *      - Bearer: []
+ *     summary: bestehenden Benuzter bearbeiten, nur für administrative Benutzer
+ *     responses:
+ *       "204":
+ *         description: Erfolgreich bearbeitet
+ *       "404":
+ *         description: Fehler
+ *       "403":
+ *         description: Access denied
+*/
 router.put('/:userId', keycloak.protect('realm:admin'), async (req, res) => {
   const user = await User.findByIdAndUpdate(req.params.userId, req.body).lean()
   user ? res.sendStatus(204) : res.sendStatus(404)
 })
 
+/**
+ * @swagger
+ * /users/{userId}:
+ *   delete:
+ *     security:
+ *      - Bearer: []
+ *     summary: Benutzer löschen (jeweils durch eigenen Benutzer)
+ *     responses:
+ *       "204":
+ *         description: Benutzer gelöscht
+ *       "404":
+ *         description: Fehler
+ *       "403":
+ *         description: Access denied
+*/
 router.delete('/:userId', keycloak.protect(protectByUserId), async (req, res) => {
   const user = await User.findByIdAndRemove(req.params.userId).lean()
   user ? res.sendStatus(204) : res.sendStatus(404)
