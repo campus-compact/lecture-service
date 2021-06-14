@@ -13,7 +13,7 @@ const router = express.Router()
  * @returns {boolean}
  */
 function protectByUserId (token, req) {
-  return req.params.userId === token.content.preferred_username
+  return req.params.userId === token.content.username
 }
 
 /**
@@ -41,7 +41,7 @@ function mapLecture (lecture) {
  *   get:
  *     security:
  *      - Bearer: []
- *     summary: Administratoren können alle Nutzer und Lectures abrufen 
+ *     summary: Administratoren können alle Nutzer und Lectures abrufen
  *     responses:
  *       "200":
  *         description: Erfolgreich
@@ -49,7 +49,7 @@ function mapLecture (lecture) {
  *         description: Fehler/Nicht gefunden
  *       "403":
  *         description: Access denied
-*/
+ */
 router.get('/', keycloak.protect('realm:admin'), async (req, res) => {
   const user = await User.find().select('-__v').lean()
   user ? res.json(user) : res.sendStatus(404)
@@ -69,7 +69,7 @@ router.get('/', keycloak.protect('realm:admin'), async (req, res) => {
  *         description: Fehler
  *       "403":
  *         description: Access denied
-*/
+ */
 router.get('/:userId/lectures', keycloak.protect(protectByUserId), async (req, res, next) => {
   let user = await User.findById(req.params.userId)
 
@@ -108,7 +108,7 @@ router.get('/:userId/lectures', keycloak.protect(protectByUserId), async (req, r
  *         description: Fehler
  *       "403":
  *         description: Access denied
-*/
+ */
 router.post('/', keycloak.protect('realm:admin'), async (req, res) => {
   const user = await User.create(req.body)
   res.status(201).json(user)
@@ -128,7 +128,7 @@ router.post('/', keycloak.protect('realm:admin'), async (req, res) => {
  *         description: Fehler
  *       "403":
  *         description: Access denied
-*/
+ */
 router.put('/:userId', keycloak.protect('realm:admin'), async (req, res) => {
   const user = await User.findByIdAndUpdate(req.params.userId, req.body).lean()
   user ? res.sendStatus(204) : res.sendStatus(404)
@@ -148,7 +148,7 @@ router.put('/:userId', keycloak.protect('realm:admin'), async (req, res) => {
  *         description: Fehler
  *       "403":
  *         description: Access denied
-*/
+ */
 router.delete('/:userId', keycloak.protect(protectByUserId), async (req, res) => {
   const user = await User.findByIdAndRemove(req.params.userId).lean()
   user ? res.sendStatus(204) : res.sendStatus(404)

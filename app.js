@@ -1,6 +1,5 @@
 import express from 'express'
 import indexRoute from './routes/index.js'
-import keycloak from './api/keycloak.js'
 import config from './config.js'
 import swaggerJsdoc from 'swagger-jsdoc'
 import swaggerUi from 'swagger-ui-express'
@@ -28,20 +27,20 @@ app.listen(config.port, () => {
 //Swagger
 const options = {
   definition: {
-    openapi: "3.0.0",
+    openapi: '3.0.0',
     info: {
-      title: "Lecture-Service API Documentation",
+      title: 'Lecture-Service API Documentation',
     },
     servers: [
       {
-        url: "http://localhost:3001",
+        url: 'http://localhost:3001',
       },
     ],
   },
-  apis: ["./routes/users.js"],
-};
+  apis: ['./routes/users.js'],
+}
 
-const specs = swaggerJsdoc(options);
-app.use('/swagger', swaggerUi.serve, swaggerUi.setup(specs));
+const specs = swaggerJsdoc(options)
+app.use('/swagger', swaggerUi.serve, swaggerUi.setup(specs))
 
 
