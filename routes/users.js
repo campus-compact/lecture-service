@@ -80,7 +80,7 @@ router.get('/:userId/lectures', keycloak.protect(protectByUserId), async (req, r
   const now = new Date()
   if (user.lectures.length === 0 || (now - user.updatedAt) / 1000 / 60 > config.syncMinutes) {
     // User was last updated more than config.syncMinutes ago. Get fresh lectures!
-    const url = `http://${config.campusDualServiceAddr}:${config.campusDualServicePort}/lecture/${req.params.userId}`
+    const url = `http://${config.campusDualServiceAddr}:${config.campusDualServicePort}/lectures/${req.params.userId}`
     const response = await axios.get(url, { headers: { Authorization: req.headers.authorization } })
     if (response.status !== 200) {
       return next(new Error(`Requesting new lectures failed with status ${response.status}\n${response.data}`))
